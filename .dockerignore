@@ -1,0 +1,11 @@
+**/__pycache__
+*.pyc
+**/venv
+modules
+modules/*
+modules*
+*/modules
+**/modules
+**/.idea
+dockerfile
+docker-compose.yml

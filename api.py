@@ -38,9 +38,21 @@ def startup():
         print('someting went wrong')
         print('='*50)
 
+
 @app.route("/")
 def hello_world():
     return "<p>Hello, World!</p>"
+
+
+@app.route('/api/estimate/truncate', methods=['DELETE'])
+def truncate_estimate():
+    try:
+        collection.delete_many({})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    return make_response(jsonify({'message': 'Data truncated'}), 200)
+
 
 @app.route('/api/estimate/update', methods=['POST'])
 def post_estimate():
@@ -54,30 +66,26 @@ def post_estimate():
     if not data:
         return Response(status=400)
     
-    # if not data.get('product_id') or not data.get('sku') or not data.get('order_qty'):
-    #     return Response(status=409)
-    
-    if params.get('reset_collection'):
-        collection.delete_many({})   
-    
     try:
         collection.insert_many(data)
-        print('test')
     except:
         return Response(status=409)
 
     return make_response(jsonify({'message': 'Data inserted'}), 201)
+
 
 @app.route('/api/estimate/all', methods=['GET'])
 def get_estimate():
     l = [{k: v for k, v in c.items() if k != '_id'} for c in collection.find()]
     return jsonify(l)
 
+
 @app.route('/api/estimate/get/<product_id>', methods=['GET'])
 def get_estimate_by_product(product_id):
     l = [{k: v for k, v in c.items() if k != '_id'} for c in collection.find({'product_id': int(product_id)})]
     print(*l, '\n', sep='\n', file=stderr)
     return jsonify(l)
+
 
 def main():
     startup()

@@ -1,79 +1,117 @@
+from datetime import datetime
+from openai import OpenAI
+import json
 import requests
 
-def call_api():
+client = OpenAI(api_key="your_openai_api_key")
+
+current_date = datetime.now().strftime("%d/%m/%Y")
+
+role_prompt = f"""
+    You are a data analysis chatbot.
+    You need to carefully and clearly analyze the data sent in JSON format and provide the result, which is the quantity needed to restock for each product for the next month (Only one month) and provide an explanation (reason).
+    The meanings of the data are as follows: 
+    1.order_qty: the quantity needed to restock. 
+    2.qty_expected_avrage_Q1: the expected quantity to be sold in quarter 1. 
+    3.qty_sold_avrage_Q1: the average quantity sold in quarter 1. 
+    4.days_in_stock_Q1: the number of days the product remained in stock in quarter 1. 
+    5.qty_expected_avrage_Q2: the expected quantity to be sold in quarter 2. 
+    6.qty_sold_avrage_Q2: the average quantity sold in quarter 2. 
+    7.days_in_stock_Q2: the number of days the product remained in stock in quarter 2. 
+    8.qty_expected_avrage_Q3: the expected quantity to be sold in quarter 3. 
+    9.qty_sold_avrage_Q3: the average quantity sold in quarter 3. 
+    10.days_in_stock_Q3: the number of days the product remained in stock in quarter 3. 
+    11.qty_expected_avrage_Q4: the expected quantity to be sold in quarter 4. 
+    12.qty_sold_avrage_Q4: the average quantity sold in quarter 4. 
+    13.days_in_stock_Q4: the number of days the product remained in stock in quarter 4. 
+    14.qty_last_halloween: the quantity sold during last year's Halloween. 
+    15.qty_last_xmas: the quantity sold during last year's Christmas. 
+    16.qtysold_30: the quantity sold in the last 30 days. 
+    17.qtysold_60: the quantity sold in the last 60 days. 
+    18.qtysold_90: the quantity sold in the last 90 days. 
+    19.qtysold_180: the quantity sold in the last 180 days. 
+    20.qtysold_720: the quantity sold in the last 2 years. 
+    21.days_in_stock_12: the total number of days the product remained in stock in the last 12 months. 
+    22.days_in_stock_24: the total number of days the product remained in stock in the last 24 months. 
+    23.qty: the quantity of the product in stock. 
+    24.created_at: the date the product was created. 
+    25.b_fill_up_date: the date of the most recent restock. 
+    26.qty_ordered: the total quantity sold. 
+    27.qty_per_month: the average quantity sold per month. 
+    28.b_ink_pris: Product cost price from the supplier.
+    29.cost: Product cost from supplier inclusive of all fees.
+    30.price: Retail price.
+    31.special_price: Special retail price.
+    32.last_time_sold: the most recent date the product was sold. 
+    33.vendor_last_fillup_qty: the quantity restocked most recently. 
+    34.qtysold_2024: the quantity sold in the year 2024. 
+    35.qtysold_2023: the quantity sold in the year 2023. 
+    36.qtysold_2022: the quantity sold in the year 2022. 
+    37.qtysold_2021: the quantity sold in the year 2021. 
+    38.qtysold_2020: the quantity sold in the year 2020. 
+    These products are candies, pastries, and children's toys sold in Norway. 
+    Currently, it's {current_date}. 
+    Please take note of the holidays and major festivals in Norway, as well as analyze based on the quantity of items sold and the number of days in stock.
+    The reason and the provided result need to include clear information about the product as well as the factors influencing that quantity.
+    The output is in JSON format with the following structure('result': []) and containing the data: product_id, sku, order_qty, and reason.
+"""
+
+system = [{"role": "system", "content": role_prompt}]
+chat_history = []  # past user and assistant turns for AI memory
+
+
+def estimate_restock_quantity(data):
+    data = str(data)
+    user = [{"role": "user", "content": data}]
+    chat_completion = client.chat.completions.create(
+        messages = system + chat_history + user,
+        model="gpt-3.5-turbo",
+        top_p=0.9,
+    )
+    
+    response = chat_completion.choices[0].message.content 
+    
+    return json.loads(response)
+
+
+def truncate_collection():
+    url = 'http://0.0.0.0:5000/api/estimate/truncate'
+    response = requests.delete(url)
+    
+    if response.status_code < 200 or response.status_code >= 300 :
+        print('Truncate collection failed')
+    else:
+        print('Truncate collection successful')
+
+
+def save_estimate(data):
     url = 'http://0.0.0.0:5000/api/estimate/update'
-    data = {
-        "result": [
-            {
-                "product_id": 126543,
-                "sku": 141589,
-                "order_qty": 3,
-                "reason": "The product 'Tyrker Shot - Bland Din Egen Shot' has been selling steadily with an average of 0.4 units per month. Despite low sales in Q1 and Q2, recent trends show an increase in sales. Considering the upcoming festive season and recent sales patterns, restocking 3 units for the next month is recommended."
-            },
-            {
-                "product_id": 217688,
-                "sku": 191498,
-                "order_qty": 7,
-                "reason": "The product 'Super Sur - Real Candy Shot i Patentflaske' has shown a consistent increase in sales with an average of 1.3 units per month. With higher sales in Q3 and Q4 and considering the upcoming holidays, restocking 7 units for the next month is recommended."
-            },
-            {
-                "product_id": 221220,
-                "sku": 122199,
-                "order_qty": 4,
-                "reason": "The product 'Liverpool FC Nøkkelring' has shown stable sales with an average of 0.7 units per month. Recent sales in Q4 indicate an increase in demand. Restocking 4 units for the next month is recommended based on the current sales trend."
-            },
-            {
-                "product_id": 217643,
-                "sku": 42511,
-                "order_qty": 4,
-                "reason": "The product 'Morsom T-Rex Kulepenn - Assorterte Farger' has been consistently selling with an average of 0.8 units per month. Recent sales in Q4 show an increase in demand. Restocking 4 units for the next month is recommended based on the current sales trend."
-            },
-            {
-                "product_id": 220858,
-                "sku": 346260,
-                "order_qty": 3,
-                "reason": "The product '5 stk Viskelær Formet som Iskrem' has shown steady sales with an average of 0.5 units per month. Recent sales in Q3 and Q4 indicate a slight increase in demand. Restocking 3 units for the next month is recommended based on the current sales trend."
-            },
-            {
-                "product_id": 217949,
-                "sku": 173746,
-                "order_qty": 7,
-                "reason": "The product '8 stk Pappkrus med Gullfolierte Fotavtrykk 270 ml' has been selling well with an average of 1.6 units per month. Recent sales trends show a consistent demand. Restocking 7 units for the next month is recommended based on the current sales pattern."
-            },
-            {
-                "product_id": 218564,
-                "sku": 42613,
-                "order_qty": 4,
-                "reason": "The product '6 stk. 30 cm - Glossy Mirror Sølvfargede Ballonger' has shown a stable sales pattern with an average of 0.9 units per month. Recent sales in Q4 indicate a slight decrease in demand. Restocking 4 units for the next month is recommended based on the current sales trend."
-            },
-            {
-                "product_id": 211858,
-                "sku": 131563,
-                "order_qty": 13,
-                "reason": "The product '60 år - 6 stk Svarte, Sølv- og Gullfarget Ballonger 30 cm' has been consistently popular with an average of 2.9 units sold per month. Recent sales trends indicate a steady demand. Restocking 13 units for the next month is recommended based on the current sales pattern and upcoming festive seasons."
-            },
-            {
-                "product_id": 226240,
-                "sku": 603428,
-                "order_qty": 2,
-                "reason": "The product 'Inflatimals Panda - Stor Uppblåsbar Panda på Pinne 1,4 Meter' has shown an increasing trend with an average of 1.3 units sold per month. Recent sales indicate a growing demand. Restocking 2 units for the next month is recommended based on the current sales pattern."
-            },
-            {
-                "product_id": 217958,
-                "sku": 42607,
-                "order_qty": 10,
-                "reason": "The product 'Craze Inkee Enhjørning Badebombe - Søt Popkorn Aroma - Med Overraskelse!' has been very popular with an average of 6.7 units sold per month. Recent sales trends show a consistent high demand. Restocking 10 units for the next month is recommended based on the current sales pattern and upcoming holidays."
-            }
-        ],
-        "reset_collection": '1'
-    }
     response = requests.post(url, json=data)
-    print(response)
 
     if response.status_code < 200 or response.status_code >= 300 :
         print('API request failed')
     else:
         print('API request successful')
+        
+        
+def main():
+    # Get data (Temporarily use data from the sample_data.json file, later will use data from the STACO API response)
+    f = open('/app/sample_data.json')
+    data = json.load(f)
+    # data = data['result']
+    total_items = len(data)
+    batch_size = 5 #The number of items will be analyzed in each iteration
+    reset_collection = True
+    
+    for i in range(0, total_items, batch_size):
+        if reset_collection:
+            truncate_collection()
+            reset_collection = False
+            
+        batch = data[i:i+batch_size]
+        response = estimate_restock_quantity(batch)
+        save_estimate(response)
+        
 
 if __name__ == '__main__':
-    call_api()
+    main()
